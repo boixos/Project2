@@ -2,11 +2,11 @@ from collections import defaultdict
 from itertools import chain, combinations
 from utils import constructTree
 
-def mineTree(headerTable, minSup, preFix, freqItemList):
+def mineTree(headerTable, minSup, preFix, freqItemList, closedFreqItems):
     # Sort the items with frequency and create a list
     sortedItemList = [item[0] for item in sorted(list(headerTable.items()), key=lambda p:p[1][0])] 
     # Start with the lowest frequency
-    print(sortedItemList)
+    # print(sortedItemList)
     for i in range(len(sortedItemList)):  
         # Pattern growth is achieved by the concatenation of suffix pattern with frequent patterns generated from conditional FP-tree
         item = sortedItemList[i]
@@ -14,14 +14,22 @@ def mineTree(headerTable, minSup, preFix, freqItemList):
         newFreqSet.add(item)
         freqItemList.append(newFreqSet)
         # Find all prefix path, construct conditional pattern base
-        conditionalPattBase, frequency = findPrefixPath(item, headerTable) 
+        conditionalPattBase, frequency = findPrefixPath(item, headerTable)
+        # print(item, conditionalPattBase)
+        continueMining = True
+        if len(conditionalPattBase):
+            closedFreqItems.append(list(item.split()) + list(set(conditionalPattBase[0]).intersection(*conditionalPattBase)))
+            # print(type(item))
+            continueMining = False
+            # print(item, set(conditionalPattBase[0]).intersection(*conditionalPattBase),frequency)
+             
         # Construct conditonal FP Tree with conditional pattern base
         conditionalTree, newHeaderTable = constructTree(conditionalPattBase, frequency, minSup)
         # print(item, newHeaderTable) 
-        if newHeaderTable != None:
+        if newHeaderTable != None and continueMining:
             # Mining recursively on the tree
             mineTree(newHeaderTable, minSup,
-                       newFreqSet, freqItemList)
+                       newFreqSet, freqItemList, closedFreqItems)
 
 def powerset(s):
     return chain.from_iterable(combinations(s, r) for r in range(1, len(s)))

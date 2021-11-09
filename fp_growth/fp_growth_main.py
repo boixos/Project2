@@ -5,14 +5,14 @@ def fpgrowthFromFile(fname, minSup, minConf):
     itemSetList, frequency = getFromFile(fname)
     # print(frequency)
     
-    print(minSup)
     fpTree, headerTable = constructTree(itemSetList, frequency, minSup)
-    print(headerTable)
+    # print(headerTable)
     freqItems = []
-    mineTree(headerTable, minSup, set(), freqItems)
-    rules = associationRule(freqItems, itemSetList, minConf)
-    return freqItems, rules
+    closedFreqItems = []
+    mineTree(headerTable, minSup, set(), freqItems, closedFreqItems)
+    # rules = associationRule(freqItems, itemSetList, minConf)
+    return freqItems, closedFreqItems
 
 if __name__ == '__main__':
-    freqItems, rules = fpgrowthFromFile("../test_data.txt", 2, 0.5)
-    print(freqItems)
+    freqItems, closedFreqItems = fpgrowthFromFile("../../test_data.txt", 2, 0.5)
+    print(closedFreqItems)
