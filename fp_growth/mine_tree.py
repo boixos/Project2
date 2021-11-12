@@ -1,81 +1,59 @@
 from collections import defaultdict
 from itertools import chain, combinations
-from utils import constructTree
+from utils import createFPTree, mergingStrategy
 
-def mineTree(headerTable, minSup, preFix, freqItemList, closedFreqItems):
-    # Sort the items with frequency and create a list
-    sortedItemList = [item[0] for item in sorted(list(headerTable.items()), key=lambda p:p[1][0])] 
-    # Start with the lowest frequency
-    # print(sortedItemList)
-    for i in range(len(sortedItemList)):  
-        # Pattern growth is achieved by the concatenation of suffix pattern with frequent patterns generated from conditional FP-tree
-        item = sortedItemList[i]
-        newFreqSet = preFix.copy()
-        newFreqSet.add(item)
-        freqItemList.append(newFreqSet)
-        # Find all prefix path, construct conditional pattern base
-        conditionalPattBase, frequency = findPrefixPath(item, headerTable)
-        # print(item, conditionalPattBase)
-        continueMining = True
-        if len(conditionalPattBase):
-            closedFreqItems.append(list(item.split()) + list(set(conditionalPattBase[0]).intersection(*conditionalPattBase)))
-            # print(type(item))
-            continueMining = False
-            # print(item, set(conditionalPattBase[0]).intersection(*conditionalPattBase),frequency)
-             
-        # Construct conditonal FP Tree with conditional pattern base
-        conditionalTree, newHeaderTable = constructTree(conditionalPattBase, frequency, minSup)
-        # print(item, newHeaderTable) 
-        if newHeaderTable != None and continueMining:
-            # Mining recursively on the tree
-            mineTree(newHeaderTable, minSup,
-                       newFreqSet, freqItemList, closedFreqItems)
+def treeMining(FPTree, headerTable, minSupport, prefix, frequent_itemset,closed_maximum,support_count_subset):
 
-def powerset(s):
-    return chain.from_iterable(combinations(s, r) for r in range(1, len(s)))
+    support_count=[v[1][0] for v in sorted(headerTable.items(),key=lambda p: p[1][0])]
+    bigL = [v[0] for v in sorted(headerTable.items(),key=lambda p: p[1][0])]
 
-def getSupport(testSet, itemSetList):
-    count = 0
-    for itemSet in itemSetList:
-        if(set(testSet).issubset(itemSet)):
-            count += 1
-    return count
+    conditionalDatabase={}
+    mergingStrategy(conditionalDatabase,FPTree,"")
+    all_support_counts=[]
+    lengthOfBigL = len(bigL)
+    for i in range(lengthOfBigL):
+        
+        new_frequentset = prefix.copy()
+        new_frequentset.append(bigL[i])
 
-def associationRule(freqItemSet, itemSetList, minConf):
-    rules = []
-    for itemSet in freqItemSet:
-        subsets = powerset(itemSet)
-        itemSetSup = getSupport(itemSet, itemSetList)
-        for s in subsets:
-            confidence = float(itemSetSup / getSupport(s, itemSetList))
-            if(confidence > minConf):
-                rules.append([set(s), set(itemSet.difference(s)), confidence])
-    return rules
+        recursive_purpose_new_frequentset=prefix.copy()
+        recursive_purpose_new_frequentset.append(bigL[i])
+        
+        #add frequent itemset to final list of frequent itemsets
+        frequent_itemset[tuple(new_frequentset)]=support_count[i]
 
-def getFrequencyFromList(itemSetList):
-    frequency = [1 for i in range(len(itemSetList))]
-    return frequency
+        
 
+        if bigL[i] in conditionalDatabase:
+          Conditional_pattern_bases=conditionalDatabase[bigL[i]]
+        else:
+          Conditional_pattern_bases={}
 
-def ascendFPtree(node, prefixPath):
-    if node.parent != None:
-        prefixPath.append(node.itemName)
-        ascendFPtree(node.parent, prefixPath)
+        
+        all_support_counts.append(support_count[i])
 
-def findPrefixPath(basePat, headerTable):
-    # First node in linked list
-    treeNode = headerTable[basePat][1] 
-    condPats = []
-    frequency = []
-    while treeNode != None:
-        prefixPath = []
-        # From leaf node all the way to root
-        ascendFPtree(treeNode, prefixPath)  
-        if len(prefixPath) > 1:
-            # Storing the prefix path and it's corresponding count
-            condPats.append(prefixPath[1:])
-            frequency.append(treeNode.count)
+        iterator=0
 
-        # Go to next node
-        treeNode = treeNode.next  
-    return condPats, frequency
+        Conditional_FPTree, Conditional_header = createFPTree(Conditional_pattern_bases,minSupport,iterator)
+
+        if Conditional_header ==None:
+          closed_maximum[tuple(new_frequentset)]=support_count[i]
+
+        if Conditional_header != None:
+            treeMining(Conditional_FPTree, Conditional_header, minSupport, recursive_purpose_new_frequentset, frequent_itemset,closed_maximum,support_count[i])
+    
+    
+    max_support_count=0
+    lengthOfMaxSupportCount = len(all_support_counts) 
+    for j in range(lengthOfMaxSupportCount):
+      if max_support_count< all_support_counts[j] :
+        max_support_count=all_support_counts[j]
+
+    superset_found=False
+
+    for super_items,super_support in closed_maximum.items():
+      if set(tuple(prefix)).issubset(super_items) and super_support==support_count_subset:
+        superset_found=True
+
+    if superset_found==False and support_count_subset>max_support_count  :
+      closed_maximum[tuple(prefix)]=support_count_subset
