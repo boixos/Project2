@@ -1,3 +1,4 @@
+import time
 #Fp tree node class
 class Node:
     def __init__(self, Node_name,counter):
@@ -61,8 +62,8 @@ def printfp(Fptree,prevpath):
     print(prevpath,current_count)
     printfp(subtree,path)
 
-def generateHeaderTable(dataset, minSupport):
-    headerTable = {}
+def generateHeaderTable(headerTable, dataset, minSupport):
+    
     for transaction in dataset:
         for item in transaction:
             headerTable[item] = dataset[transaction] + headerTable.get(item,0)
@@ -72,11 +73,11 @@ def generateHeaderTable(dataset, minSupport):
             itemsTobeDeleted.append(item)
     for item in itemsTobeDeleted:
         headerTable.pop(item)
-    return headerTable
 
 
 def createFPTree(dataset, minSupport, iterator):
-    headerTable = generateHeaderTable(dataset, minSupport)
+    headerTable = {}
+    generateHeaderTable(headerTable, dataset, minSupport)
     iterator=iterator+1
 
     frequent_itemset = set(headerTable.keys())
@@ -182,7 +183,8 @@ def treeMining(FPTree, headerTable, minSupport, prefix, frequent_itemset,closed_
       closed_maximum[tuple(prefix)]=support_count_subset
 
 
-def fpgrowthFromFile(fname, minSup, minConf):
+def fpgrowthFromFile(fname, minSup):
+    start = time.time()
     itemSetList = loadingData(fname)
     # print(frequency)
     initSet = generateInitalSet(itemSetList)
@@ -193,9 +195,15 @@ def fpgrowthFromFile(fname, minSup, minConf):
     frequent_itemset = {}
     closed_maximum={}
     treeMining(FPtree, headerTable, minSup, [], frequent_itemset,closed_maximum,0)
+    end = time.time()
+    print(end-start)
     return frequent_itemset, closed_maximum
 
 if __name__ == '__main__':
-    freqItems, closedFreqItems = fpgrowthFromFile("../../test_data_2.txt", 2, 0.5)
+    minimum_support = 1000
+    print("Minimum support : ", minimum_support)
+    
+    freqItems, closedFreqItems = fpgrowthFromFile("../../BMS2.txt", minimum_support)
+    
     print(closedFreqItems)
-    print(len(freqItems))
+    
