@@ -16,17 +16,15 @@ def remove_sep(number):
 		return True
 
 def loadingData(fname):
-    itemSetList = []    
-    with open(fname, 'r') as file:
-        records = file.readlines()
-        for line in records:
-            line = list( filter(remove_sep, line.split()))
-            itemSetList.append(line)
-    return itemSetList
-
-def generateInitalSet(dataset):
+    dataset = []
+    file = open(fname, 'r')    
+    records = file.readlines()
+    for line in records:
+        line = list( filter(remove_sep, line.split()))
+        dataset.append(line)
     frozen_Dictionaries = {}
-    for trans in dataset:
+    for i in range(len(dataset)):
+      trans = dataset[i]  
       if frozenset(trans) in frozen_Dictionaries:
         frozen_Dictionaries[frozenset(trans)]=frozen_Dictionaries[frozenset(trans)]+1
       else:
@@ -34,33 +32,33 @@ def generateInitalSet(dataset):
     return frozen_Dictionaries
 
 def mergingStrategy(conditionalDatabase,Fptree,prevpath):
-  for item,subtree in Fptree.children.items():
-    current_count=subtree.count
+  for item in Fptree.children:
+    subtree = Fptree.children[item]
+    
     if item in conditionalDatabase:
       if(len(prevpath)>0):
         k=prevpath.split(",")
-        if len(k[0])==0 :
+        lengthOfK = len(k[0])
+        if lengthOfK == 0 :
+          current_count=subtree.count
           conditionalDatabase[item][frozenset(k[1:])]=current_count
         else:
+          current_count=subtree.count
           conditionalDatabase[item][frozenset(k)]=current_count
     else:
       conditionalDatabase[item]={}
       if(len(prevpath)>0):
         k=prevpath.split(",")
-        if len(k[0])==0 :
+        lengthOfK = len(k[0])
+        if lengthOfK == 0 :
+          current_count=subtree.count
           conditionalDatabase[item][frozenset(k[1:])]=current_count
         else:
+          current_count=subtree.count
           conditionalDatabase[item][frozenset(k)]=current_count
-    path=prevpath+","+item
+    path=prevpath + ","
+    path = path + item
     mergingStrategy(conditionalDatabase,subtree,path)
-
-def printfp(Fptree,prevpath):
-  for item,subtree in Fptree.children.items():
-    path=prevpath+item
-    current_count=subtree.count
-    print("item",item)
-    print(prevpath,current_count)
-    printfp(subtree,path)
 
 def generateHeaderTable(headerTable, dataset, minSupport):
     
@@ -74,127 +72,144 @@ def generateHeaderTable(headerTable, dataset, minSupport):
     for item in itemsTobeDeleted:
         headerTable.pop(item)
 
+class FPTree:
+    def __init__(self,dataset, minSupport, iterator):
+        self.dataset = dataset
+        self.minSupport = minSupport
+        self.iterator = iterator
 
-def createFPTree(dataset, minSupport, iterator):
-    headerTable = {}
-    generateHeaderTable(headerTable, dataset, minSupport)
-    iterator=iterator+1
+    def createFPTree(self):
+        headerTable = {}
+        generateHeaderTable(headerTable, self.dataset, self.minSupport)
+        self.iterator=self.iterator+1
 
-    frequent_itemset = set(headerTable.keys())
+        frequent_itemset = set(headerTable.keys())
+        lengthOfFrequentItemset = len(frequent_itemset)
+        if lengthOfFrequentItemset == 0:
+            return None, None
 
-    if len(frequent_itemset) == 0:
-        return None, None
+        root = Node('Null Set',1)
 
-    root = Node('Null Set',1)
+        for k in headerTable.keys():
+            headerTable[k] = [headerTable[k], None]
 
-    for k in headerTable:
-        headerTable[k] = [headerTable[k], None]
+        for itemset,count in self.dataset.items():
+            frequent_transaction = {}
 
-    for itemset,count in dataset.items():
-        frequent_transaction = {}
+            for item in itemset:
+                if item in frequent_itemset:
+                    frequent_transaction[item] = headerTable[item][0]
+            AddToTransaction = len(frequent_transaction) >= 1
+            if AddToTransaction:
+                ordered_itemset = [v[0] for v in sorted(frequent_transaction.items(), key=lambda p: p[1], reverse=True)]
+                self.iterator=0
+                self.addTransactionToTree(ordered_itemset, root, headerTable, count , self.iterator)
 
-        for item in itemset:
-            if item in frequent_itemset:
-                frequent_transaction[item] = headerTable[item][0]
-        AddToTransaction = len(frequent_transaction) >= 1
-        if AddToTransaction:
-            ordered_itemset = [v[0] for v in sorted(frequent_transaction.items(), key=lambda p: p[1], reverse=True)]
+        return root, headerTable
+
+
+    def addNodeLink(self,startNode,targetNode,iterator):
+        iterator =iterator+1
+        while (startNode.nodeLink != None):
+            startNode = startNode.nodeLink
+        startNode.nodeLink = targetNode
+
+    def addTransactionToTree(self, itemset, FPTree, headerTable, count ,iterator):
+        if itemset[0] in FPTree.children:
+            FPTree.children[itemset[0]].count=FPTree.children[itemset[0]].count+count
+        else:
+            FPTree.children[itemset[0]] = Node(itemset[0], count)
+
+            if headerTable[itemset[0]][1] == None:
+                headerTable[itemset[0]][1] = FPTree.children[itemset[0]]
+            else:
+                iterator = 0
+                self.addNodeLink(headerTable[itemset[0]][1], FPTree.children[itemset[0]],iterator)
+
+        if len(itemset) >= 2:
+            self.addTransactionToTree(itemset[1::], FPTree.children[itemset[0]], headerTable, count ,iterator)
+
+class TreeMining:
+    def __init__(self,FPTree, headerTable, minSupport, prefix, frequent_itemset,closed_maximum,support_count_subset):
+        self.FPTree = FPTree 
+        self.headerTable = headerTable 
+        self.minSupport = minSupport 
+        self.prefix = prefix 
+        self.frequent_itemset = frequent_itemset
+        self.closed_maximum = closed_maximum 
+        self.support_count_subset = support_count_subset
+
+    def treeMining(self):
+
+        support_count=[v[1][0] for v in sorted(self.headerTable.items(),key=lambda p: p[1][0])]
+        bigL = [v[0] for v in sorted(self.headerTable.items(),key=lambda p: p[1][0])]
+
+        conditionalDatabase={}
+        mergingStrategy(conditionalDatabase,self.FPTree,"")
+        all_support_counts=[]
+        lengthOfBigL = len(bigL)
+        for i in range(lengthOfBigL):
+            bigLcurrentIterationValue = bigL[i]
+            support_countItrValue = support_count[i]
+            new_frequentset = self.prefix.copy()
+            new_frequentset.append(bigLcurrentIterationValue)
+
+            recursive_purpose_new_frequentset=self.prefix.copy()
+            recursive_purpose_new_frequentset.append(bigLcurrentIterationValue)
+            
+            #add frequent itemset to final list of frequent itemsets
+            self.frequent_itemset[tuple(new_frequentset)]= support_countItrValue
+
+            
+
+            if bigLcurrentIterationValue in conditionalDatabase:
+                Conditional_pattern_bases=conditionalDatabase[bigLcurrentIterationValue]
+            else:
+                Conditional_pattern_bases={}
+
+            
+            all_support_counts.append(support_count[i])
+
             iterator=0
-            addTransactionToTree(ordered_itemset, root, headerTable, count , iterator)
+            fp_tree = FPTree(Conditional_pattern_bases,self.minSupport,iterator)
+            Conditional_FPTree, Conditional_header = fp_tree.createFPTree()
 
-    return root, headerTable
+            if Conditional_header ==None:
+                self.closed_maximum[tuple(new_frequentset)]=support_countItrValue
 
-
-def addNodeLink(startNode,targetNode,iterator):
-    iterator =iterator+1
-    while (startNode.nodeLink != None):
-        startNode = startNode.nodeLink
-    startNode.nodeLink = targetNode
-
-def addTransactionToTree(itemset, FPTree, headerTable, count ,iterator):
-    if itemset[0] in FPTree.children:
-        FPTree.children[itemset[0]].count=FPTree.children[itemset[0]].count+count
-    else:
-        FPTree.children[itemset[0]] = Node(itemset[0], count)
-
-        if headerTable[itemset[0]][1] == None:
-            headerTable[itemset[0]][1] = FPTree.children[itemset[0]]
-        else:
-           iterator = 0
-           addNodeLink(headerTable[itemset[0]][1], FPTree.children[itemset[0]],iterator)
-
-    if len(itemset) >= 2:
-        addTransactionToTree(itemset[1::], FPTree.children[itemset[0]], headerTable, count ,iterator)
-
-def treeMining(FPTree, headerTable, minSupport, prefix, frequent_itemset,closed_maximum,support_count_subset):
-
-    support_count=[v[1][0] for v in sorted(headerTable.items(),key=lambda p: p[1][0])]
-    bigL = [v[0] for v in sorted(headerTable.items(),key=lambda p: p[1][0])]
-
-    conditionalDatabase={}
-    mergingStrategy(conditionalDatabase,FPTree,"")
-    all_support_counts=[]
-    lengthOfBigL = len(bigL)
-    for i in range(lengthOfBigL):
+            if Conditional_header != None:
+                tp = TreeMining(Conditional_FPTree, Conditional_header, self.minSupport, recursive_purpose_new_frequentset, self.frequent_itemset,self.closed_maximum,support_count[i])
+                tp.treeMining()
         
-        new_frequentset = prefix.copy()
-        new_frequentset.append(bigL[i])
+        max_support_count=0
+        lengthOfMaxSupportCount = len(all_support_counts) 
+        for j in range(lengthOfMaxSupportCount):
+            if max_support_count< all_support_counts[j] :
+                max_support_count=all_support_counts[j]
 
-        recursive_purpose_new_frequentset=prefix.copy()
-        recursive_purpose_new_frequentset.append(bigL[i])
-        
-        #add frequent itemset to final list of frequent itemsets
-        frequent_itemset[tuple(new_frequentset)]=support_count[i]
+        superset_found=False
 
-        
+        for super_items,super_support in self.closed_maximum.items():
+            if set(tuple(self.prefix)).issubset(super_items) and super_support==self.support_count_subset:
+                superset_found=True
 
-        if bigL[i] in conditionalDatabase:
-          Conditional_pattern_bases=conditionalDatabase[bigL[i]]
-        else:
-          Conditional_pattern_bases={}
-
-        
-        all_support_counts.append(support_count[i])
-
-        iterator=0
-
-        Conditional_FPTree, Conditional_header = createFPTree(Conditional_pattern_bases,minSupport,iterator)
-
-        if Conditional_header ==None:
-          closed_maximum[tuple(new_frequentset)]=support_count[i]
-
-        if Conditional_header != None:
-            treeMining(Conditional_FPTree, Conditional_header, minSupport, recursive_purpose_new_frequentset, frequent_itemset,closed_maximum,support_count[i])
-    
-    
-    max_support_count=0
-    lengthOfMaxSupportCount = len(all_support_counts) 
-    for j in range(lengthOfMaxSupportCount):
-      if max_support_count< all_support_counts[j] :
-        max_support_count=all_support_counts[j]
-
-    superset_found=False
-
-    for super_items,super_support in closed_maximum.items():
-      if set(tuple(prefix)).issubset(super_items) and super_support==support_count_subset:
-        superset_found=True
-
-    if superset_found==False and support_count_subset>max_support_count  :
-      closed_maximum[tuple(prefix)]=support_count_subset
+        if superset_found==False and self.support_count_subset>max_support_count:
+            self.closed_maximum[tuple(self.prefix)]=self.support_count_subset
 
 
 def fpgrowthFromFile(fname, minSup):
     start = time.time()
-    itemSetList = loadingData(fname)
     # print(frequency)
-    initSet = generateInitalSet(itemSetList)
+    initSet = loadingData(fname)
     iterator=0
     # print(initSet)
-    FPtree, headerTable = createFPTree(initSet, minSup,iterator)
+    fp_tree = FPTree(initSet, minSup,iterator)
+    FPtree, headerTable = fp_tree.createFPTree()
     # print(headerTable)
     frequent_itemset = {}
     closed_maximum={}
-    treeMining(FPtree, headerTable, minSup, [], frequent_itemset,closed_maximum,0)
+    tp = TreeMining(FPtree, headerTable, minSup, [], frequent_itemset,closed_maximum,0)
+    tp.treeMining()
     end = time.time()
     print(end-start)
     return frequent_itemset, closed_maximum
@@ -203,7 +218,7 @@ if __name__ == '__main__':
     minimum_support = 1000
     print("Minimum support : ", minimum_support)
     
-    freqItems, closedFreqItems = fpgrowthFromFile("../../BMS2.txt", minimum_support)
+    freqItems, closedFreqItems = fpgrowthFromFile("../../BMS1.txt", minimum_support)
     
     print(closedFreqItems)
     
